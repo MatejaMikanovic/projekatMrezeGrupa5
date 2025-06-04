@@ -1,81 +1,52 @@
-﻿using System;
+﻿// Vezba 8 - Zadatak 2 + Vezba 9 - Zadatak 1
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Net.Sockets;
+using System.IO;
 using System.Net;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Net.Sockets;
+using System.Runtime.Serialization.Formatters.Binary;
+using Model; // Zadatak 2 - pristup klasi Igrac
 
-namespace ConsoleApp1
+namespace TCPServer
 {
     class Program
     {
-        // Lista za čuvanje podataka o igračima
-        static List<string> players = new List<string>();
+        // Zadatak 2 Tačka 3 – čuvanje podataka o prijavljenim igračima
+        static List<Igrac> igraci = new List<Igrac>();
 
+        // Zadatak 2 - Entry point programa
         static void Main(string[] args)
         {
-            // Zadatak 2.1) Pokretanje TCP osluškivača za prijavu igrača
-            Thread serverThread = new Thread(StartServer);
-            serverThread.Start();
+            // Zadatak 2 Tačka 1 – pokretanje TCP osluškivača
+            TcpListener listener = new TcpListener(IPAddress.Any, 9000);
+            listener.Start();
+            Console.WriteLine("Server je pokrenut i čeka igrače...");
 
-            // Testiranje sa dva klijenta (simulacija)
-            Thread player1Thread = new Thread(() => StartClient("Player 1", "John Doe"));
-            player1Thread.Start();
-            Thread player2Thread = new Thread(() => StartClient("Player 2", "Jane Smith"));
-            player2Thread.Start();
-        }
-
-        static void StartServer()
-        {
-            // Zadatak 2.1) Pokretanje TCP osluškivača za prijavu igrača
-            TcpListener server = new TcpListener(IPAddress.Any, 5000);
-            server.Start();
-            Console.WriteLine("Server started...");
-
-            // Zadatak 2.2) Prijem podataka za dva igrača
-            for (int i = 0; i < 2; i++)
+            while (true)
             {
-                TcpClient client = server.AcceptTcpClient();
-                Console.WriteLine("Player connected.");
-                NetworkStream stream = client.GetStream();
+                TcpClient klijent = listener.AcceptTcpClient(); // prihvatanje konekcije
+                Console.WriteLine("Klijent povezan.");
 
-                // Zadatak 2.2) Prijem osnovnih podataka igrača
-                byte[] buffer = new byte[1024];
-                int bytesRead = stream.Read(buffer, 0, buffer.Length);
-                string playerInfo = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                players.Add(playerInfo);
-                Console.WriteLine($"Received player info: {playerInfo}");
+                // Zadatak 2 Tačka 2 B – prijem podataka o igraču (ime, prezime)
+                NetworkStream tok = klijent.GetStream();
+                BinaryFormatter formater = new BinaryFormatter();
 
-                // Zadatak 2.3) Slanje potvrde o uspešnoj prijavi
-                string response = "Registration successful";
-                buffer = Encoding.UTF8.GetBytes(response);
-                stream.Write(buffer, 0, buffer.Length);
-                Console.WriteLine("Confirmation sent.");
+                try
+                {
+                    Igrac igrac = (Igrac)formater.Deserialize(tok); // deserijalizacija objekta
+                    igraci.Add(igrac);                              // Zadatak 2 Tačka 3 B – dodavanje u listu
+                    Console.WriteLine($"Prijavljen igrač: {igrac}");
+
+                    // Zadatak 2 Tačka 4 – slanje potvrde o uspešnoj prijavi
+                    formater.Serialize(tok, "Uspešna prijava");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Greška: " + ex.Message);
+                }
+
+                klijent.Close();
             }
-
-            server.Stop();
-            Console.WriteLine("Server stopped.");
-        }
-
-        static void StartClient(string playerName, string fullName)
-        {
-            // Povezivanje na server putem TCP-a
-            TcpClient client = new TcpClient("127.0.0.1", 5000);
-            NetworkStream stream = client.GetStream();
-
-            // Slanje osnovnih podataka igrača
-            byte[] buffer = Encoding.UTF8.GetBytes(fullName);
-            stream.Write(buffer, 0, buffer.Length);
-
-            // Primanje potvrde o uspešnoj prijavi
-            buffer = new byte[1024];
-            int bytesRead = stream.Read(buffer, 0, buffer.Length);
-            string response = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-            Console.WriteLine($"{playerName} received: {response}");
-
-            client.Close();
         }
     }
 }
